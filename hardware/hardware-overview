@@ -1,0 +1,78 @@
+# Hardware Overview
+
+InfoHub is designed to run on simple, affordable and reliable hardware. The goal is to create an information display
+solution that can be deployed in many locations with minimal cost and maintenance. This section describes the hardware
+choices used in the project and why they were selected.
+
+---
+
+## Display
+
+Any standard monitor or TV with an HDMI input can be used.  
+Preferred features include:
+
+- Automatic power on/off or timer functionality
+- Stable HDMI behaviour during long-term operation
+- Ability to stay powered on for extended periods
+- Optional HDMI-CEC support
+
+The system does not depend on a specific brand or model.  
+The only requirement is a reliable HDMI connection.
+
+---
+
+## Device: Raspberry Pi 4
+
+The system is powered by a **Raspberry Pi 4**, chosen for several reasons:
+
+- Small, silent and energy-efficient
+- Stable HDMI output
+- Good browser performance for a lightweight display system
+- Well-supported community ecosystem
+- Easy to replace or scale to multiple units
+- Works well with kiosk and signage operating systems
+
+Both 4 GB and 8 GB versions are suitable, depending on availability.
+
+---
+
+## Operating System: FullPageOS
+
+The project uses **FullPageOS**, a kiosk-style operating system that automatically loads a fullscreen browser on startup.
+It was selected because it:
+
+- Boots directly into a predefined URL
+- Requires minimal maintenance
+- Supports scheduled reboots
+- Works reliably on Raspberry Pi 4
+- Keeps the system locked down and focused on the display
+
+This makes it ideal for environments where displays must run continuously without user interaction.
+
+If FullPageOS ever becomes unavailable, the project can switch to any equivalent kiosk OS with similar functionality.
+
+---
+
+## Installation and Deployment
+
+The preparation of each device is handled through a custom installation file located in the `/scripts/` folder.  
+This includes:
+
+- Initial configuration
+- Browser behaviour settings
+- Automation setup
+- Optional device metadata routines
+
+The installation file is kept separate from this hardware documentation to maintain a clear structure.
+
+---
+
+## Summary
+
+The hardware concept is intentionally simple:
+
+- A screen with HDMI
+- A Raspberry Pi 4
+- FullPageOS as a kiosk browser system
+
+This combination provides a reliable, low-cost and easily maintainable foundation for InfoHub.
