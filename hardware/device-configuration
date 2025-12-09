@@ -1,0 +1,67 @@
+# Device Configuration
+
+This document describes how the Raspberry Pi 4 used in InfoHub is configured to run as a stable, low-maintenance
+information display. The goal is to ensure that each device boots reliably, loads the correct webpage and can operate
+continuously with minimal supervision.
+
+---
+
+## Base Image: FullPageOS
+
+Each device uses a FullPageOS image, chosen because it:
+
+- boots directly into a fullscreen browser
+- automatically loads the configured target URL
+- supports scheduled reboot or maintenance
+- requires no user interaction after startup
+- works reliably on Raspberry Pi 4 hardware
+
+FullPageOS is written to the SD card using any standard imaging tool.
+
+---
+
+## Initial Configuration
+
+After the image is written, the following steps are applied:
+
+1. Set WiFi or Ethernet configuration (depending on deployment)
+2. Define the target URL for the display
+3. Enable automatic boot into kiosk mode
+4. Disable unnecessary services to improve stability
+5. Configure automatic reboot if required
+6. Set resolution and display parameters
+
+These settings ensure the device behaves consistently across deployments.
+
+---
+
+## Automation Script
+
+A custom installation script is used to complete the setup in a repeatable way.  
+This script is available in the `/scripts/` folder and handles:
+
+- writing configuration files
+- setting browser parameters
+- adding scheduled tasks
+- applying optional metadata routines
+
+Using a script ensures uniform setup across all devices.
+
+---
+
+## Power and Display
+
+The Raspberry Pi connects directly to any HDMI-equipped display.  
+For best results, the screen should support:
+
+- automatic power on/off
+- timer-controlled operation
+- stable behaviour under continuous use
+
+---
+
+## Summary
+
+The configuration process is built around stability and repeatability.  
+Once set up, each device boots directly into an information display, requires minimal maintenance, and can be replaced
+quickly if needed.
