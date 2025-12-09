@@ -1,0 +1,38 @@
+# InfoHub Scripts
+
+This folder contains automation scripts used to prepare, configure and maintain devices in the InfoHub environment.
+The scripts focus on creating a repeatable and reliable deployment process for low-cost display hardware.
+
+All scripts are provided in an abstracted and environment-neutral form.  
+Any deployment-specific values (tokens, network settings, URLs, etc.) have been removed.
+
+---
+
+## Purpose
+
+The scripts in this folder help automate tasks such as:
+
+- initial device setup  
+- configuration adjustments  
+- scheduled routines  
+- display control  
+- performance and reliability improvements  
+- monitoring integration  
+- maintenance workflows  
+
+Each script is designed to be easy to understand, modify and adapt.
+
+---
+
+## Usage
+
+Scripts can be run individually or as part of a larger provisioning process.  
+Refer to instructions within each script for details on usage or adaptation.
+
+---
+
+## Notes
+
+- This folder will expand over time as more components of InfoHub are documented.
+- Scripts are intentionally generic to avoid exposing environment-specific information.
+- Examples are meant for learning, adaptation and demonstration of working methods.
