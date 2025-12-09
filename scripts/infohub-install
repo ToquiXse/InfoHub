@@ -1,0 +1,240 @@
+#!/bin/bash
+# =====================================================
+# InfoHub Device Install Script
+# Version: v1.0.0 (Public Example)
+# =====================================================
+# Functions:
+# 1. Reduce SD card wear (disable swap, logs in RAM, noatime)
+# 2. Install base packages and utilities
+# 3. Create screen_off.sh (turn display off)
+# 4. Create screen_on.sh + systemd service
+# 5. Schedule automatic screen off + reboot (generic cron times)
+# 6. Set browser zoom (generic path)
+# 7. Install Netdata if missing (claim tokens removed)
+# 8. Add Netdata to PATH
+# 9. Create and enable Host Label update (internal_ip)
+# 10. Execute Host Label update immediately
+# 11. Improve terminal security
+# 12. Fully idempotent (safe to re-run)
+# =====================================================
+
+# --- Run as root ---
+if [ "$EUID" -ne 0 ]; then
+  exec sudo -E bash "$0" "$@"
+fi
+
+set +e
+export DEBIAN_FRONTEND=noninteractive
+LOGFILE="/var/log/infohub_install.log"
+mkdir -p /var/log
+echo "Starting InfoHub installation: $(date)" | tee -a "$LOGFILE"
+
+# ---------- Helpers ----------
+log(){ echo "$1" | tee -a "$LOGFILE"; }
+ok(){ log "[OK] $1"; }
+warn(){ log "[WARN] $1"; }
+err(){ log "[ERROR] $1"; }
+flush_fs(){ sync; }
+
+ensure_cron_line(){
+  local LINE="$1"
+  (crontab -l 2>/dev/null; echo "$LINE") | sort -u | crontab -
+}
+
+# ---------- 0) SD card robustness ----------
+log "[SD] Reducing SD card wear..."
+if systemctl list-unit-files | grep -q '^dphys-swapfile'; then
+  systemctl stop dphys-swapfile 2>/dev/null || true
+  systemctl disable dphys-swapfile 2>/dev/null || true
+fi
+
+if ! grep -qE '^tmpfs\s+/var/log\s+tmpfs' /etc/fstab; then
+  echo "tmpfs /var/log tmpfs defaults,noatime,nosuid,size=50m 0 0" >> /etc/fstab
+  ok "/var/log moved to RAM"
+fi
+
+if grep -E '^[^#].*\s/\s' /etc/fstab | grep -vq 'noatime'; then
+  cp /etc/fstab /etc/fstab.bak 2>/dev/null
+  awk '($2=="/"){sub(/defaults/,"defaults,noatime")}1' /etc/fstab.bak > /etc/fstab
+  ok "noatime set (backup: /etc/fstab.bak)"
+fi
+flush_fs
+
+# ---------- 1) Install packages ----------
+log "[Packages] Updating and installing utilities..."
+apt-get update -y >> "$LOGFILE" 2>&1
+apt-get install -y \
+  x11-xserver-utils libraspberrypi-bin wget ca-certificates curl >> "$LOGFILE" 2>&1 || true
+ok "Base utilities installed"
+flush_fs
+
+# ---------- 2) Create screen_off ----------
+log "[Screen] Creating /usr/local/bin/screen_off.sh ..."
+cat > /usr/local/bin/screen_off.sh <<'EOF'
+#!/bin/bash
+LOG="/var/log/screen_power.log"
+echo "[screen_off] $(date)" | tee -a "$LOG"
+
+if command -v xset >/dev/null 2>&1; then
+  export DISPLAY=:0
+  if id pi >/dev/null 2>&1; then sudo -u pi xset -display :0 dpms force off && exit 0; fi
+  xset -display :0 dpms force off && exit 0
+fi
+
+if command -v vcgencmd >/dev/null 2>&1; then
+  /usr/bin/vcgencmd display_power 0 && exit 0
+fi
+
+exit 1
+EOF
+chmod +x /usr/local/bin/screen_off.sh
+ok "screen_off.sh installed"
+flush_fs
+
+# ---------- 3) Create screen_on + service ----------
+log "[Screen] Creating screen_on.sh + service ..."
+cat > /usr/local/bin/screen_on.sh <<'EOF'
+#!/bin/bash
+/usr/bin/vcgencmd display_power 1 >/dev/null 2>&1 || true
+
+if command -v xset >/dev/null 2>&1; then
+  export DISPLAY=:0
+  if id pi >/dev/null 2>&1; then sudo -u pi xset -display :0 dpms force on || true; fi
+  xset -display :0 dpms force on || true
+fi
+EOF
+chmod +x /usr/local/bin/screen_on.sh
+
+cat > /etc/systemd/system/infohub-screen-on.service <<'EOF'
+[Unit]
+Description=Turn screen on at boot
+After=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/screen_on.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable infohub-screen-on.service >/dev/null 2>&1
+ok "screen_on service enabled"
+flush_fs
+
+# ---------- 4) Cron (generic times) ----------
+log "[Cron] Scheduling generic screen off + reboot ..."
+ensure_cron_line "0 22 * * * /usr/local/bin/screen_off.sh"
+ensure_cron_line "0 6 * * * /sbin/reboot"
+ok "Cron jobs added"
+flush_fs
+
+# ---------- 5) Browser zoom ----------
+GENERIC_BROWSER_SCRIPT="/usr/local/bin/browser_startup_script"
+ZOOM_VALUE="1.0"
+log "[Zoom] Applying generic zoom setting..."
+
+if [ -f "$GENERIC_BROWSER_SCRIPT" ]; then
+  sed -i '/--force-device-scale-factor=/d' "$GENERIC_BROWSER_SCRIPT"
+  sed -i "/--kiosk/a --force-device-scale-factor=${ZOOM_VALUE}" "$GENERIC_BROWSER_SCRIPT"
+  ok "Zoom updated"
+else
+  warn "Browser script not found (generic path) – skipping zoom"
+fi
+flush_fs
+
+# ---------- 6) Netdata (sanitized) ----------
+log "[Netdata] Checking installation..."
+
+NETDATA_BIN="/opt/netdata/usr/sbin/netdata"
+ALREADY_HAS_NETDATA=false
+[ -x "$NETDATA_BIN" ] && ALREADY_HAS_NETDATA=true
+
+if $ALREADY_HAS_NETDATA; then
+  ok "Netdata already installed"
+else
+  log "[Netdata] Installing Netdata (sanitized example)..."
+  apt-get install -y wget ca-certificates >> "$LOGFILE" 2>&1 || true
+
+  # Placeholder claim command:
+  # Replace YOUR_CLAIM_TOKEN and YOUR_ROOM_ID with actual values during deployment.
+  wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh >/dev/null 2>&1
+  bash /tmp/netdata-kickstart.sh --nightly-channel \
+    --claim-token YOUR_CLAIM_TOKEN \
+    --claim-rooms YOUR_ROOM_ID \
+    --claim-url https://app.netdata.cloud >> "$LOGFILE" 2>&1
+
+  ok "Netdata installed (claim requires real tokens)"
+fi
+flush_fs
+
+# Add Netdata PATH
+echo 'export PATH="$PATH:/opt/netdata/bin"' > /etc/profile.d/netdata_path.sh
+flush_fs
+
+# ---------- 7) Netdata Host Label (internal IP) ----------
+log "[Netdata] Creating Host Label (IP) updater..."
+
+cat > /usr/local/bin/update_netdata_ip.sh <<'EOF'
+#!/bin/bash
+IP=$(hostname -I | awk '{print $1}')
+CONF="/opt/netdata/etc/netdata/netdata.conf"
+
+mkdir -p "$(dirname "$CONF")"
+
+if grep -q "internal_ip" "$CONF" 2>/dev/null; then
+  sed -i "s/internal_ip = .*/internal_ip = $IP/" "$CONF"
+else
+  printf "\n[host labels]\n    internal_ip = %s\n" "$IP" >> "$CONF"
+fi
+
+systemctl restart netdata 2>/dev/null || true
+EOF
+chmod +x /usr/local/bin/update_netdata_ip.sh
+
+cat > /etc/systemd/system/update-netdata-ip.timer <<'EOF'
+[Unit]
+Description=Update Netdata Host Label (IP) after boot
+
+[Timer]
+OnBootSec=5min
+AccuracySec=30s
+Unit=update-netdata-ip.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+cat > /etc/systemd/system/update-netdata-ip.service <<'EOF'
+[Unit]
+Description=Update Netdata Host Label (IP)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/update_netdata_ip.sh
+EOF
+
+systemctl daemon-reload
+systemctl enable --now update-netdata-ip.timer >/dev/null 2>&1
+ok "Host label updater active"
+flush_fs
+
+# ---------- 8) Terminal security ----------
+log "[TTY] Hardening terminal settings..."
+sed -i 's/^#\?NAutoVTs=.*/NAutoVTs=1/' /etc/systemd/logind.conf
+
+mkdir -p /etc/systemd/system/getty@tty1.service.d/
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --noclear %I $TERM
+EOF
+
+systemctl daemon-reload
+ok "Terminal security applied"
+flush_fs
+
+# ---------- Finish ----------
+ok "Installation complete. Reboot recommended."
+reboot
